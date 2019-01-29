@@ -1,5 +1,7 @@
 //(() => {
 const canvas = document.querySelector('canvas');
+canvas.height = window.innerHeight;
+canvas.width = window.innerWidth;
 const gl = canvas.getContext("webgl");
 //if (gl) {
 gl.clearColor(0.0, 0.0, 0.0, 1.0);
