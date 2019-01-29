@@ -83,7 +83,7 @@ const programInfo = {
     },
 };
 
-function initBuffers(gl) {
+function initBuffers(gl, shape) {
 
     // Create a buffer for the square's positions.
 
@@ -94,21 +94,14 @@ function initBuffers(gl) {
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-    // Now create an array of positions for the square.
-
-    const positions = [
-        -1.0, 1.0,
-        1.0, 1.0,
-        -1.0, -1.0,
-        1.0, -1.0,
-    ];
+    
 
     // Now pass the list of positions into WebGL to build the
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
 
     gl.bufferData(gl.ARRAY_BUFFER,
-        new Float32Array(positions),
+        new Float32Array(shape),
         gl.STATIC_DRAW);
 
     return {
@@ -116,7 +109,14 @@ function initBuffers(gl) {
     };
 }
 
-const buffers = initBuffers(gl);
+fetch("shape.json").then(response =>
+    {
+        response.json().then(shape =>{
+            const buffers = initBuffers(gl, shape);
+            drawScene(gl, programInfo, buffers)
+        })
+    })
+
 
 function drawScene(gl, programInfo, buffers) {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -203,6 +203,6 @@ function drawScene(gl, programInfo, buffers) {
     }
 }
 
-drawScene(gl, programInfo, buffers)
+
 //}
 //})();
