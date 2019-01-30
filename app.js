@@ -16,25 +16,24 @@ const FRAGMENT_SHADER_SOURCE = `
 `;
 
 
-
-const GRAPHICS_LIBRARY = document.querySelector('canvas').getContext('webgl')
+const GL = document.querySelector('canvas').getContext('webgl')
 
 const SHADER_PROGRAM = (() =>{
-    const vertexShader = loadShader(GRAPHICS_LIBRARY, GRAPHICS_LIBRARY.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
-    const fragmentShader = loadShader(GRAPHICS_LIBRARY, GRAPHICS_LIBRARY.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
+    const vertexShader = loadShader(GL, GL.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
+    const fragmentShader = loadShader(GL, GL.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
     // Create the shader program
 
-    const shaderProgram = GRAPHICS_LIBRARY.createProgram();
+    const shaderProgram = GL.createProgram();
     
-    GRAPHICS_LIBRARY.attachShader(shaderProgram, vertexShader);
-    GRAPHICS_LIBRARY.attachShader(shaderProgram, fragmentShader);
-    GRAPHICS_LIBRARY.linkProgram(shaderProgram);
+    GL.attachShader(shaderProgram, vertexShader);
+    GL.attachShader(shaderProgram, fragmentShader);
+    GL.linkProgram(shaderProgram);
 
     // If creating the shader program failed, alert
 
-    if (!GRAPHICS_LIBRARY.getProgramParameter(shaderProgram, GRAPHICS_LIBRARY.LINK_STATUS)) {
-        alert('Unable to initialize the shader program: ' + GRAPHICS_LIBRARY.getProgramInfoLog(shaderProgram));
+    if (!GL.getProgramParameter(shaderProgram, GL.LINK_STATUS)) {
+        alert('Unable to initialize the shader program: ' + GL.getProgramInfoLog(shaderProgram));
         return null;
     }
 
@@ -44,11 +43,11 @@ const SHADER_PROGRAM = (() =>{
 const PROGRAM_INFO = {
     program: SHADER_PROGRAM,
     attribLocations: {
-        vertexPosition: GRAPHICS_LIBRARY.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
+        vertexPosition: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
     },
     uniformLocations: {
-        projectionMatrix: GRAPHICS_LIBRARY.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
-        modelViewMatrix: GRAPHICS_LIBRARY.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
+        projectionMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
+        modelViewMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
     },
 };
 
@@ -76,53 +75,75 @@ function loadShader(graphicsLibrary, type, source) {
 
 
 
-function initializeBuffer(graphicsLibrary, shape) {
+function initializeBuffer(GL, shape) {
     // Create a buffer for the square's positions.
-
-    const positionBuffer = graphicsLibrary.createBuffer();
+    const positionBuffer = GL.createBuffer();
 
     // Select the positionBuffer as the one to apply buffer
     // operations to from here out.
-
-    graphicsLibrary.bindBuffer(graphicsLibrary.ARRAY_BUFFER, positionBuffer);
-
-    
+    GL.bindBuffer(GL.ARRAY_BUFFER, positionBuffer);
 
     // Now pass the list of positions into WebGL to build the
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
-
-    graphicsLibrary.bufferData(graphicsLibrary.ARRAY_BUFFER,
-        new Float32Array(shape),
-        graphicsLibrary.STATIC_DRAW);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(shape), GL.STATIC_DRAW);
     return {
         position: positionBuffer,
     };
 }
 
+let shape = [-1,1,1,1,-1,-1,1,-1];
 
 window.addEventListener('resize', drawScene, false)
 
 drawScene();
 
-function drawScene() {
-    GRAPHICS_LIBRARY.canvas.height = window.innerHeight;
-    GRAPHICS_LIBRARY.canvas.width = window.innerWidth;
-    GRAPHICS_LIBRARY.viewport(0, 0, GRAPHICS_LIBRARY.canvas.width, GRAPHICS_LIBRARY.canvas.height)
- 
-    const shape = [-1,1,1,1,-1,-1,1,-1];
+window.setInterval(drawScene, 50);
 
-    const buffer = initializeBuffer(GRAPHICS_LIBRARY, shape);
+window.addEventListener("keypress", (e)=>{
+    const distance = .05;
+    switch(e.key){
+        case 'w':
+        {
+            shape[1] += distance;
+            break;
+        }
+        case 'a':
+        {
+            shape[0] -= distance;
+            break;
+        }
+        case 's':
+        {
+            shape[1] -= distance;
+            break;
+        }
+        case 'd':
+        {
+            shape[0] += distance;
+            break;
+        }
+    }
+})
+
+function drawScene() {
+    GL.canvas.height = window.innerHeight;
+    GL.canvas.width = window.innerWidth;
+    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
+ 
+    
+
+    const buffer = initializeBuffer(GL, shape);
 
     
-    GRAPHICS_LIBRARY.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-    GRAPHICS_LIBRARY.clearDepth(1.0);                 // Clear everything
-    GRAPHICS_LIBRARY.enable(GRAPHICS_LIBRARY.DEPTH_TEST);           // Enable depth testing
-    GRAPHICS_LIBRARY.depthFunc(GRAPHICS_LIBRARY.LEQUAL);            // Near things obscure far things
+    GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
+    GL.clearDepth(1.0);                 // Clear everything
+    GL.enable(GL.DEPTH_TEST);           // Enable depth testing
+    GL.depthFunc(GL.LEQUAL);            // Near things obscure far things
 
     // Clear the canvas before we start drawing on it.
 
-    GRAPHICS_LIBRARY.clear(GRAPHICS_LIBRARY.COLOR_BUFFER_BIT | GRAPHICS_LIBRARY.DEPTH_BUFFER_BIT);
+    GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
     // Create a perspective matrix, a special matrix that is
     // used to simulate the distortion of perspective in a camera.
@@ -132,7 +153,7 @@ function drawScene() {
     // and 100 units away from the camera.
 
     const fieldOfView = 45 * Math.PI / 180;   // in radians
-    const aspect = GRAPHICS_LIBRARY.canvas.width / GRAPHICS_LIBRARY.canvas.height;
+    const aspect = GL.canvas.width / GL.canvas.height;
     const zNear = 0.1;
     const zFar = 100.0;
     const projectionMatrix = mat4.create();
@@ -160,34 +181,34 @@ function drawScene() {
     // buffer into the vertexPosition attribute.
     {
         const numComponents = 2;  // pull out 2 values per iteration
-        const type = GRAPHICS_LIBRARY.FLOAT;    // the data in the buffer is 32bit floats
+        const type = GL.FLOAT;    // the data in the buffer is 32bit floats
         const normalize = false;  // don't normalize
         const stride = 0;         // how many bytes to get from one set of values to the next
         // 0 = use type and numComponents above
         const offset = 0;         // how many bytes inside the buffer to start from
-        GRAPHICS_LIBRARY.bindBuffer(GRAPHICS_LIBRARY.ARRAY_BUFFER, buffer.position);
-        GRAPHICS_LIBRARY.vertexAttribPointer(
+        GL.bindBuffer(GL.ARRAY_BUFFER, buffer.position);
+        GL.vertexAttribPointer(
             PROGRAM_INFO.attribLocations.vertexPosition,
             numComponents,
             type,
             normalize,
             stride,
             offset);
-        GRAPHICS_LIBRARY.enableVertexAttribArray(
+        GL.enableVertexAttribArray(
             PROGRAM_INFO.attribLocations.vertexPosition);
     }
 
     // Tell WebGL to use our program when drawing
 
-    GRAPHICS_LIBRARY.useProgram(PROGRAM_INFO.program);
+    GL.useProgram(PROGRAM_INFO.program);
 
     // Set the shader uniforms
 
-    GRAPHICS_LIBRARY.uniformMatrix4fv(
+    GL.uniformMatrix4fv(
         PROGRAM_INFO.uniformLocations.projectionMatrix,
         false,
         projectionMatrix);
-    GRAPHICS_LIBRARY.uniformMatrix4fv(
+    GL.uniformMatrix4fv(
         PROGRAM_INFO.uniformLocations.modelViewMatrix,
         false,
         modelViewMatrix);
@@ -195,7 +216,7 @@ function drawScene() {
     {
         const offset = 0;
         const vertexCount = 4;
-        GRAPHICS_LIBRARY.drawArrays(GRAPHICS_LIBRARY.TRIANGLE_STRIP, offset, vertexCount);
+        GL.drawArrays(GL.TRIANGLE_STRIP, offset, vertexCount);
     }
 }
 
