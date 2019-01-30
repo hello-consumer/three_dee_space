@@ -1,17 +1,23 @@
 const VERTEX_SHADER_SOURCE = `
     attribute vec4 aVertexPosition;
+    attribute vec4 aVertexColor;
 
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
+    varying lowp vec4 vColor;
+
     void main() {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+      vColor = aVertexColor;
     }
   `;
 
 const FRAGMENT_SHADER_SOURCE = `
+  varying lowp vec4 vColor;
+
   void main() {
-    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    gl_FragColor = vColor;
   }
 `;
 
@@ -44,6 +50,7 @@ const PROGRAM_INFO = {
     program: SHADER_PROGRAM,
     attribLocations: {
         vertexPosition: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
+        vertexColor: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexColor'),
     },
     uniformLocations: {
         projectionMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
@@ -75,7 +82,7 @@ function loadShader(graphicsLibrary, type, source) {
 
 
 
-function initializeBuffer(GL, shape) {
+function initializeBuffers(GL, shape, colors) {
     // Create a buffer for the square's positions.
     const positionBuffer = GL.createBuffer();
 
@@ -87,53 +94,50 @@ function initializeBuffer(GL, shape) {
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
     GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(shape), GL.STATIC_DRAW);
+
+
+    
+    const colorBuffer = GL.createBuffer();
+    GL.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(colors), GL.STATIC_DRAW);
+
+
     return {
         position: positionBuffer,
+        color: colorBuffer,
     };
 }
 
-let shape = [-1,1,1,1,-1,-1,1,-1];
+
 
 window.addEventListener('resize', drawScene, false)
+
+
 
 drawScene();
 
 window.setInterval(drawScene, 50);
-
-window.addEventListener("keypress", (e)=>{
-    const distance = .05;
-    switch(e.key){
-        case 'w':
-        {
-            shape[1] += distance;
-            break;
-        }
-        case 'a':
-        {
-            shape[0] -= distance;
-            break;
-        }
-        case 's':
-        {
-            shape[1] -= distance;
-            break;
-        }
-        case 'd':
-        {
-            shape[0] += distance;
-            break;
-        }
-    }
-})
 
 function drawScene() {
     GL.canvas.height = window.innerHeight;
     GL.canvas.width = window.innerWidth;
     GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
  
-    
+    const shape = [
+        -1 ,  1,
+        1  ,  1,
+        -1 , -1,
+        1  , -1,
+    ];
 
-    const buffer = initializeBuffer(GL, shape);
+    const colors = [
+        1.0,  1.0,  1.0,  1.0,    // white
+        1.0,  0.0,  0.0,  1.0,    // red
+        0.0,  1.0,  0.0,  1.0,    // green
+        0.0,  0.0,  1.0,  1.0,    // blue
+      ];
+
+    const buffers = initializeBuffers(GL, shape, colors);
 
     
     GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -152,7 +156,9 @@ function drawScene() {
     // and we only want to see objects between 0.1 units
     // and 100 units away from the camera.
 
+
     const fieldOfView = 45 * Math.PI / 180;   // in radians
+    
     const aspect = GL.canvas.width / GL.canvas.height;
     const zNear = 0.1;
     const zFar = 100.0;
@@ -186,7 +192,7 @@ function drawScene() {
         const stride = 0;         // how many bytes to get from one set of values to the next
         // 0 = use type and numComponents above
         const offset = 0;         // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, buffer.position);
+        GL.bindBuffer(GL.ARRAY_BUFFER, buffers.position);
         GL.vertexAttribPointer(
             PROGRAM_INFO.attribLocations.vertexPosition,
             numComponents,
@@ -196,6 +202,25 @@ function drawScene() {
             offset);
         GL.enableVertexAttribArray(
             PROGRAM_INFO.attribLocations.vertexPosition);
+    }
+
+    {
+        const numComponents = 4;  // pull out 2 values per iteration
+        const type = GL.FLOAT;    // the data in the buffer is 32bit floats
+        const normalize = false;  // don't normalize
+        const stride = 0;         // how many bytes to get from one set of values to the next
+        // 0 = use type and numComponents above
+        const offset = 0;         // how many bytes inside the buffer to start from
+        GL.bindBuffer(GL.ARRAY_BUFFER, buffers.color);
+        GL.vertexAttribPointer(
+            PROGRAM_INFO.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        GL.enableVertexAttribArray(
+            PROGRAM_INFO.attribLocations.vertexColor);
     }
 
     // Tell WebGL to use our program when drawing
@@ -220,3 +245,26 @@ function drawScene() {
     }
 }
 
+
+window.addEventListener("keypress", (e)=>{
+    const distance = .05;
+    switch(e.key){
+        case 'w':
+        {
+            break;
+        }
+        case 's':
+        {
+            break;
+        }
+        case 'd':
+        {
+            break;
+        }
+        case 'a':
+        {
+            break;
+        }
+        
+    }
+})
