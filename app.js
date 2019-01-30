@@ -1,16 +1,4 @@
-//(() => {
-const canvas = document.querySelector('canvas');
-canvas.height = window.innerHeight;
-canvas.width = window.innerWidth;
-const gl = canvas.getContext("webgl");
-//if (gl) {
-gl.clearColor(0.0, 0.0, 0.0, 1.0);
-gl.clear(gl.COLOR_BUFFER_BIT);
-
-gl.createBuffer()
-
-
-const vsSource = `
+const VERTEX_SHADER_SOURCE = `
     attribute vec4 aVertexPosition;
 
     uniform mat4 uModelViewMatrix;
@@ -21,78 +9,82 @@ const vsSource = `
     }
   `;
 
-const fsSource = `
+const FRAGMENT_SHADER_SOURCE = `
   void main() {
     gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
   }
 `;
 
-function initShaderProgram(gl, vsSource, fsSource) {
-    const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+
+
+const GRAPHICS_LIBRARY = document.querySelector('canvas').getContext('webgl')
+
+const SHADER_PROGRAM = (() =>{
+    const vertexShader = loadShader(GRAPHICS_LIBRARY, GRAPHICS_LIBRARY.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
+    const fragmentShader = loadShader(GRAPHICS_LIBRARY, GRAPHICS_LIBRARY.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
     // Create the shader program
 
-    const shaderProgram = gl.createProgram();
-    gl.attachShader(shaderProgram, vertexShader);
-    gl.attachShader(shaderProgram, fragmentShader);
-    gl.linkProgram(shaderProgram);
+    const shaderProgram = GRAPHICS_LIBRARY.createProgram();
+    
+    GRAPHICS_LIBRARY.attachShader(shaderProgram, vertexShader);
+    GRAPHICS_LIBRARY.attachShader(shaderProgram, fragmentShader);
+    GRAPHICS_LIBRARY.linkProgram(shaderProgram);
 
     // If creating the shader program failed, alert
 
-    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+    if (!GRAPHICS_LIBRARY.getProgramParameter(shaderProgram, GRAPHICS_LIBRARY.LINK_STATUS)) {
+        alert('Unable to initialize the shader program: ' + GRAPHICS_LIBRARY.getProgramInfoLog(shaderProgram));
         return null;
     }
 
     return shaderProgram;
-}
+})();
 
-function loadShader(gl, type, source) {
-    const shader = gl.createShader(type);
-
-    // Send the source to the shader object
-
-    gl.shaderSource(shader, source);
-
-    // Compile the shader program
-
-    gl.compileShader(shader);
-
-    // See if it compiled successfully
-
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-
-    return shader;
-}
-
-const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-
-const programInfo = {
-    program: shaderProgram,
+const PROGRAM_INFO = {
+    program: SHADER_PROGRAM,
     attribLocations: {
-        vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        vertexPosition: GRAPHICS_LIBRARY.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
     },
     uniformLocations: {
-        projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-        modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+        projectionMatrix: GRAPHICS_LIBRARY.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
+        modelViewMatrix: GRAPHICS_LIBRARY.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
     },
 };
 
-function initBuffers(gl, shape) {
 
+function loadShader(graphicsLibrary, type, source) {
+    const shader = graphicsLibrary.createShader(type);
+
+    // Send the source to the shader object
+
+    graphicsLibrary.shaderSource(shader, source);
+
+    // Compile the shader program
+
+    graphicsLibrary.compileShader(shader);
+
+    // See if it compiled successfully
+
+    if (!graphicsLibrary.getShaderParameter(shader, graphicsLibrary.COMPILE_STATUS)) {
+        alert('An error occurred compiling the shaders: ' + graphicsLibrary.getShaderInfoLog(shader));
+        graphicsLibrary.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+
+
+function initializeBuffer(graphicsLibrary, shape) {
     // Create a buffer for the square's positions.
 
-    const positionBuffer = gl.createBuffer();
+    const positionBuffer = graphicsLibrary.createBuffer();
 
     // Select the positionBuffer as the one to apply buffer
     // operations to from here out.
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    graphicsLibrary.bindBuffer(graphicsLibrary.ARRAY_BUFFER, positionBuffer);
 
     
 
@@ -100,33 +92,37 @@ function initBuffers(gl, shape) {
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
 
-    gl.bufferData(gl.ARRAY_BUFFER,
+    graphicsLibrary.bufferData(graphicsLibrary.ARRAY_BUFFER,
         new Float32Array(shape),
-        gl.STATIC_DRAW);
-
+        graphicsLibrary.STATIC_DRAW);
     return {
         position: positionBuffer,
     };
 }
 
-fetch("shape.json").then(response =>
-    {
-        response.json().then(shape =>{
-            const buffers = initBuffers(gl, shape);
-            drawScene(gl, programInfo, buffers)
-        })
-    })
 
+window.addEventListener('resize', drawScene, false)
 
-function drawScene(gl, programInfo, buffers) {
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-    gl.clearDepth(1.0);                 // Clear everything
-    gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-    gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+drawScene();
+
+function drawScene() {
+    GRAPHICS_LIBRARY.canvas.height = window.innerHeight;
+    GRAPHICS_LIBRARY.canvas.width = window.innerWidth;
+    GRAPHICS_LIBRARY.viewport(0, 0, GRAPHICS_LIBRARY.canvas.width, GRAPHICS_LIBRARY.canvas.height)
+ 
+    const shape = [-1,1,1,1,-1,-1,1,-1];
+
+    const buffer = initializeBuffer(GRAPHICS_LIBRARY, shape);
+
+    
+    GRAPHICS_LIBRARY.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
+    GRAPHICS_LIBRARY.clearDepth(1.0);                 // Clear everything
+    GRAPHICS_LIBRARY.enable(GRAPHICS_LIBRARY.DEPTH_TEST);           // Enable depth testing
+    GRAPHICS_LIBRARY.depthFunc(GRAPHICS_LIBRARY.LEQUAL);            // Near things obscure far things
 
     // Clear the canvas before we start drawing on it.
 
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    GRAPHICS_LIBRARY.clear(GRAPHICS_LIBRARY.COLOR_BUFFER_BIT | GRAPHICS_LIBRARY.DEPTH_BUFFER_BIT);
 
     // Create a perspective matrix, a special matrix that is
     // used to simulate the distortion of perspective in a camera.
@@ -136,7 +132,7 @@ function drawScene(gl, programInfo, buffers) {
     // and 100 units away from the camera.
 
     const fieldOfView = 45 * Math.PI / 180;   // in radians
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const aspect = GRAPHICS_LIBRARY.canvas.width / GRAPHICS_LIBRARY.canvas.height;
     const zNear = 0.1;
     const zFar = 100.0;
     const projectionMatrix = mat4.create();
@@ -164,45 +160,42 @@ function drawScene(gl, programInfo, buffers) {
     // buffer into the vertexPosition attribute.
     {
         const numComponents = 2;  // pull out 2 values per iteration
-        const type = gl.FLOAT;    // the data in the buffer is 32bit floats
+        const type = GRAPHICS_LIBRARY.FLOAT;    // the data in the buffer is 32bit floats
         const normalize = false;  // don't normalize
         const stride = 0;         // how many bytes to get from one set of values to the next
         // 0 = use type and numComponents above
         const offset = 0;         // how many bytes inside the buffer to start from
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-        gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexPosition,
+        GRAPHICS_LIBRARY.bindBuffer(GRAPHICS_LIBRARY.ARRAY_BUFFER, buffer.position);
+        GRAPHICS_LIBRARY.vertexAttribPointer(
+            PROGRAM_INFO.attribLocations.vertexPosition,
             numComponents,
             type,
             normalize,
             stride,
             offset);
-        gl.enableVertexAttribArray(
-            programInfo.attribLocations.vertexPosition);
+        GRAPHICS_LIBRARY.enableVertexAttribArray(
+            PROGRAM_INFO.attribLocations.vertexPosition);
     }
 
     // Tell WebGL to use our program when drawing
 
-    gl.useProgram(programInfo.program);
+    GRAPHICS_LIBRARY.useProgram(PROGRAM_INFO.program);
 
     // Set the shader uniforms
 
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.projectionMatrix,
+    GRAPHICS_LIBRARY.uniformMatrix4fv(
+        PROGRAM_INFO.uniformLocations.projectionMatrix,
         false,
         projectionMatrix);
-    gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
+    GRAPHICS_LIBRARY.uniformMatrix4fv(
+        PROGRAM_INFO.uniformLocations.modelViewMatrix,
         false,
         modelViewMatrix);
 
     {
         const offset = 0;
         const vertexCount = 4;
-        gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+        GRAPHICS_LIBRARY.drawArrays(GRAPHICS_LIBRARY.TRIANGLE_STRIP, offset, vertexCount);
     }
 }
 
-
-//}
-//})();
