@@ -1,26 +1,43 @@
 const VERTEX_SHADER_SOURCE = `
     attribute vec4 aVertexPosition;
-    attribute vec2 aTextureCoordinate;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoord;
 
+    uniform mat4 uNormalMatrix;
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
-    varying highp vec2 vTextureCoordinate;
+    varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
-    void main() {
-      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vTextureCoordinate = aTextureCoordinate;
+    void main(void) {
+    gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+    vTextureCoord = aTextureCoord;
+
+    // Apply lighting effect
+
+    highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+    highp vec3 directionalLightColor = vec3(1, 1, 1);
+    highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+
+    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+
+    highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+    vLighting = ambientLight + (directionalLightColor * directional);
     }
   `;
 
 const FRAGMENT_SHADER_SOURCE = `
-  varying highp vec2 vTextureCoordinate;
+    varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
 
-  uniform sampler2D uSampler;
+    uniform sampler2D uSampler;
 
-  void main() {
-    gl_FragColor = texture2D(uSampler, vTextureCoordinate);
-  }
+    void main(void) {
+    highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+
+    gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
+    }
 `;
 
 
@@ -52,11 +69,13 @@ const PROGRAM_INFO = {
     program: SHADER_PROGRAM,
     attribLocations: {
         vertexPosition: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
-        textureCoordinates: GL.getAttribLocation(SHADER_PROGRAM, 'aTextureCoordinate'),
+        vertexNormal: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexNormal'),
+        textureCoordinates: GL.getAttribLocation(SHADER_PROGRAM, 'aTextureCoord'),
     },
     uniformLocations: {
         projectionMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
         modelViewMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
+        normalMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uNormalMatrix'),
         uSampler: GL.getUniformLocation(SHADER_PROGRAM, 'uSampler'),
     },
 };
@@ -145,19 +164,52 @@ const TEXTURE_COORDINATES = [
 ];
 
 
+const VERTEX_NORMALS = [
+    // Front
+     0.0,  0.0,  1.0,
+     0.0,  0.0,  1.0,
+     0.0,  0.0,  1.0,
+     0.0,  0.0,  1.0,
+
+    // Back
+     0.0,  0.0, -1.0,
+     0.0,  0.0, -1.0,
+     0.0,  0.0, -1.0,
+     0.0,  0.0, -1.0,
+
+    // Top
+     0.0,  1.0,  0.0,
+     0.0,  1.0,  0.0,
+     0.0,  1.0,  0.0,
+     0.0,  1.0,  0.0,
+
+    // Bottom
+     0.0, -1.0,  0.0,
+     0.0, -1.0,  0.0,
+     0.0, -1.0,  0.0,
+     0.0, -1.0,  0.0,
+
+    // Right
+     1.0,  0.0,  0.0,
+     1.0,  0.0,  0.0,
+     1.0,  0.0,  0.0,
+     1.0,  0.0,  0.0,
+
+    // Left
+    -1.0,  0.0,  0.0,
+    -1.0,  0.0,  0.0,
+    -1.0,  0.0,  0.0,
+    -1.0,  0.0,  0.0
+  ];
+
+
 
 function loadShader(graphicsLibrary, type, source) {
     const shader = graphicsLibrary.createShader(type);
 
-    // Send the source to the shader object
-
     graphicsLibrary.shaderSource(shader, source);
 
-    // Compile the shader program
-
     graphicsLibrary.compileShader(shader);
-
-    // See if it compiled successfully
 
     if (!graphicsLibrary.getShaderParameter(shader, graphicsLibrary.COMPILE_STATUS)) {
         alert('An error occurred compiling the shaders: ' + graphicsLibrary.getShaderInfoLog(shader));
@@ -218,10 +270,19 @@ const BUFFERS = (() => {
     GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
         new Uint16Array(INDICES), GL.STATIC_DRAW);
 
+
+    const normalBuffer = GL.createBuffer();
+    GL.bindBuffer(GL.ARRAY_BUFFER, normalBuffer);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(VERTEX_NORMALS),
+    GL.STATIC_DRAW);
+
+      
+
     return {
         position: positionBuffer,
         indices: indexBuffer,
-        textureCoordinates:  textureCoordinatesBuffer
+        textureCoordinates:  textureCoordinatesBuffer,
+        normal: normalBuffer
     };
 
 })();
@@ -252,15 +313,7 @@ drawScene();
 
 window.setInterval(drawScene, 20);
 
-function drawScene() {
-    GL.canvas.height = window.innerHeight;
-    GL.canvas.width = window.innerWidth;
-    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
-    GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-    GL.clearDepth(1.0);                 // Clear everything
-    GL.enable(GL.DEPTH_TEST);           // Enable depth testing
-    GL.depthFunc(GL.LEQUAL);            // Near things obscure far things
-
+function updateVariables(){
     if (magnification_increase) {
         magnification += 0.1;
     }
@@ -292,100 +345,46 @@ function drawScene() {
     if (yaw_decrease) {
         yaw -= 0.1;
     }
+}
 
-    // Clear the canvas before we start drawing on it.
-
+function drawScene() {
+    GL.canvas.height = window.innerHeight;
+    GL.canvas.width = window.innerWidth;
+    updateVariables();
+    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
+    GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
+    GL.clearDepth(1.0);                 // Clear everything
+    GL.enable(GL.DEPTH_TEST);           // Enable depth testing
+    GL.depthFunc(GL.LEQUAL);            // Near things obscure far things
     GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
 
-    // Create a perspective matrix, a special matrix that is
-    // used to simulate the distortion of perspective in a camera.
-    // Our field of view is 45 degrees, with a width/height
-    // ratio that matches the display size of the canvas
-    // and we only want to see objects between 0.1 units
-    // and 100 units away from the camera.
-
-
-    const fieldOfView = 45 * Math.PI / 180;   // in radians
-
-    const aspect = GL.canvas.width / GL.canvas.height;
-    const zNear = 0.1;
-    const zFar = 100.0;
     const projectionMatrix = mat4.create();
-
-    // note: glmatrix.js always has the first argument
-    // as the destination to receive the result.
-    mat4.perspective(projectionMatrix,
-        fieldOfView,
-        aspect,
-        zNear,
-        zFar);
-
-    // Set the drawing position to the "identity" point, which is
-    // the center of the scene.
-    const modelViewMatrix = mat4.create();
-
-    // Now move the drawing position a bit to where we want to
-    // start drawing the square.
-
-    const zoom = -6.0 + magnification;
-
-    mat4.translate(modelViewMatrix,     // destination matrix
-        modelViewMatrix,     // matrix to translate
-        [-0.0, 0.0, zoom]);  // amount to translate
-
-    mat4.rotate(modelViewMatrix,  // destination matrix
-        modelViewMatrix,  // matrix to rotate
-        yaw,   // amount to rotate in radians
-        [0, 1, 0]);       // axis to rotate around
-
-    mat4.rotate(modelViewMatrix,  // destination matrix
-        modelViewMatrix,  // matrix to rotate
-        roll,   // amount to rotate in radians
-        [0, 0, 1]);       // axis to rotate around
-
-    mat4.rotate(modelViewMatrix,  // destination matrix
-        modelViewMatrix,  // matrix to rotate
-        pitch,   // amount to rotate in radians
-        [1, 0, 0]);       // axis to rotate around
-
-    // Tell WebGL how to pull out the positions from the position
-    // buffer into the vertexPosition attribute.
-    {
-        const numComponents = 3;  // pull out 2 values per iteration
-        const type = GL.FLOAT;    // the data in the buffer is 32bit floats
-        const normalize = false;  // don't normalize
-        const stride = 0;         // how many bytes to get from one set of values to the next
-        // 0 = use type and numComponents above
-        const offset = 0;         // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.position);
-        GL.vertexAttribPointer(
-            PROGRAM_INFO.attribLocations.vertexPosition,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        GL.enableVertexAttribArray(
-            PROGRAM_INFO.attribLocations.vertexPosition);
-    }
-
-    {
-        const num = 2; // every coordinate composed of 2 values
-        const type = GL.FLOAT; // the data in the buffer is 32 bit float
-        const normalize = false; // don't normalize
-        const stride = 0; // how many bytes to get from one set to the next
-        const offset = 0; // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.textureCoordinates);
-        GL.vertexAttribPointer(PROGRAM_INFO.attribLocations.textureCoordinates, num, type, normalize, stride, offset);
-        GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.textureCoordinates);
-    }
-
+    mat4.perspective(projectionMatrix, 45 * Math.PI / 180, GL.canvas.width / GL.canvas.height, 0.1, 100.0);
     
+    const modelViewMatrix = mat4.create();
+    const zoom = -6.0 + magnification;
+    mat4.translate(modelViewMatrix, modelViewMatrix, [-0.0, 0.0, zoom]);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, yaw, [0, 1, 0]);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, roll, [0, 0, 1]);
+    mat4.rotate(modelViewMatrix, modelViewMatrix, pitch, [1, 0, 0]);
 
+    const normalMatrix = mat4.create();
+    mat4.invert(normalMatrix, modelViewMatrix);
+    mat4.transpose(normalMatrix, normalMatrix);
 
+    GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.position);
+    GL.vertexAttribPointer(PROGRAM_INFO.attribLocations.vertexPosition, 3, GL.FLOAT, false, 0, 0);
+    GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.vertexPosition);
+    
+    GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.textureCoordinates);
+    GL.vertexAttribPointer(PROGRAM_INFO.attribLocations.textureCoordinates, 2, GL.FLOAT, false, 0, 0);
+    GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.textureCoordinates);
+    
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, BUFFERS.indices);
 
-    // Tell WebGL to use our program when drawing
+    GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.normal);
+    GL.vertexAttribPointer(PROGRAM_INFO.attribLocations.vertexNormal, 3, GL.FLOAT, false, 0, 0);
+    GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.vertexNormal);
 
     GL.useProgram(PROGRAM_INFO.program);
 
@@ -393,23 +392,11 @@ function drawScene() {
     GL.bindTexture(GL.TEXTURE_2D, TEXTURE);
     GL.uniform1i(PROGRAM_INFO.uniformLocations.uSampler, 0);
 
-    // Set the shader uniforms
+    GL.uniformMatrix4fv(PROGRAM_INFO.uniformLocations.projectionMatrix, false, projectionMatrix);
+    GL.uniformMatrix4fv(PROGRAM_INFO.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+    GL.uniformMatrix4fv(PROGRAM_INFO.uniformLocations.normalMatrix, false, normalMatrix);
 
-    GL.uniformMatrix4fv(
-        PROGRAM_INFO.uniformLocations.projectionMatrix,
-        false,
-        projectionMatrix);
-    GL.uniformMatrix4fv(
-        PROGRAM_INFO.uniformLocations.modelViewMatrix,
-        false,
-        modelViewMatrix);
-
-    {
-        const vertexCount = 36;
-        const type = GL.UNSIGNED_SHORT;
-        const offset = 0;
-        GL.drawElements(GL.TRIANGLES, vertexCount, type, offset);
-    }
+    GL.drawElements(GL.TRIANGLES, 36, GL.UNSIGNED_SHORT, 0);
 }
 
 function handleInput(key, active) {
