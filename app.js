@@ -380,9 +380,7 @@ function drawScene() {
         GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.textureCoordinates);
     }
 
-    GL.activeTexture(GL.TEXTURE0);
-    GL.bindTexture(GL.TEXTURE_2D, TEXTURE);
-    GL.uniform1i(PROGRAM_INFO.uniformLocations.uSampler, 0);
+    
 
 
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, BUFFERS.indices);
@@ -390,6 +388,10 @@ function drawScene() {
     // Tell WebGL to use our program when drawing
 
     GL.useProgram(PROGRAM_INFO.program);
+
+    GL.activeTexture(GL.TEXTURE0);
+    GL.bindTexture(GL.TEXTURE_2D, TEXTURE);
+    GL.uniform1i(PROGRAM_INFO.uniformLocations.uSampler, 0);
 
     // Set the shader uniforms
 
