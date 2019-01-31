@@ -82,7 +82,7 @@ function loadShader(graphicsLibrary, type, source) {
 
 
 
-function initializeBuffers(GL, shape, colors) {
+function initializeBuffers(GL, shape, colors, indices) {
     // Create a buffer for the square's positions.
     const positionBuffer = GL.createBuffer();
 
@@ -95,16 +95,29 @@ function initializeBuffers(GL, shape, colors) {
     // JavaScript array, then use it to fill the current buffer.
     GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(shape), GL.STATIC_DRAW);
 
+    var mappedColors = [];
 
-    
+    for (var j = 0; j < colors.length; ++j) {
+      const c = colors[j];
+  
+      // Repeat each color four times for the four vertices of the face
+      mappedColors = mappedColors.concat(c, c, c, c);
+    }
+
     const colorBuffer = GL.createBuffer();
     GL.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(colors), GL.STATIC_DRAW);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(mappedColors), GL.STATIC_DRAW);
 
+    const indexBuffer = GL.createBuffer();
+    GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices), GL.STATIC_DRAW);
 
     return {
         position: positionBuffer,
         color: colorBuffer,
+        indices: indexBuffer
     };
 }
 
@@ -112,7 +125,10 @@ function initializeBuffers(GL, shape, colors) {
 
 window.addEventListener('resize', drawScene, false)
 
-let squareRotation = 0.0;
+let yaw = 0.0;
+let roll = 0.0;
+let pitch = 0.0;
+let magnification = 0.0;
 
 drawScene();
 
@@ -123,11 +139,44 @@ function drawScene() {
     GL.canvas.width = window.innerWidth;
     GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
  
+        //X , Y , Z
     const shape = [
-        1 ,  1,
-        -1  ,  1,
-        1 , -1,
-        -1  , -1,
+        //Front
+        -1.0, -1.0, 1.0,
+        1.0, -1.0, 1.0,
+        1.0, 1.0, 1.0,
+        -1.0, 1.0, 1.0,
+
+        //Back
+        -1.0, -1.0, -1.0,
+        -1.0, 1.0, -1.0,
+        1.0, 1.0, -1.0, 
+        1.0, -1.0, -1.0,
+
+        //Top
+        -1.0, 1.0, -1.0,
+        -1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 
+        1.0, 1.0, -1.0,
+
+        //Bottom
+        -1.0, -1.0, -1.0,
+        1.0, -1.0, -1.0,
+        1.0, -1.0, 1.0, 
+        -1.0, -1.0, 1.0,
+
+        //Right
+        1.0, -1.0, -1.0,
+        1.0, 1.0, -1.0,
+        1.0, 1.0, 1.0, 
+        1.0, -1.0, 1.0,
+
+        //Left
+        -1.0, -1.0, -1.0,
+        -1.0, -1.0, 1.0,
+        -1.0, 1.0, 1.0, 
+        -1.0, 1.0, -1.0,
+
     ];
 
     const colors = [
@@ -135,9 +184,20 @@ function drawScene() {
         1.0,  0.0,  0.0,  1.0,    // red
         0.0,  1.0,  0.0,  1.0,    // green
         0.0,  0.0,  1.0,  1.0,    // blue
+        1.0,  1.0,  0.0,  1.0,    // yellow
+        1.0,  0.0,  1.0,  1.0,    // purple
       ];
 
-    const buffers = initializeBuffers(GL, shape, colors);
+    const indices = [
+        0,  1,  2,      0,  2,  3,    // front
+        4,  5,  6,      4,  6,  7,    // back
+        8,  9,  10,     8,  10, 11,   // top
+        12, 13, 14,     12, 14, 15,   // bottom
+        16, 17, 18,     16, 18, 19,   // right
+        20, 21, 22,     20, 22, 23,   // left
+      ];
+
+    const buffers = initializeBuffers(GL, shape, colors, indices);
 
     
     GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -179,19 +239,31 @@ function drawScene() {
     // Now move the drawing position a bit to where we want to
     // start drawing the square.
 
+    const zoom = -6.0 + magnification;
+
     mat4.translate(modelViewMatrix,     // destination matrix
         modelViewMatrix,     // matrix to translate
-        [-0.0, 0.0, -6.0]);  // amount to translate
+        [-0.0, 0.0, zoom]);  // amount to translate
 
     mat4.rotate(modelViewMatrix,  // destination matrix
         modelViewMatrix,  // matrix to rotate
-        squareRotation,   // amount to rotate in radians
+        yaw,   // amount to rotate in radians
+        [0, 1, 0]);       // axis to rotate around
+
+    mat4.rotate(modelViewMatrix,  // destination matrix
+        modelViewMatrix,  // matrix to rotate
+        roll,   // amount to rotate in radians
         [0, 0, 1]);       // axis to rotate around
+
+    mat4.rotate(modelViewMatrix,  // destination matrix
+        modelViewMatrix,  // matrix to rotate
+        pitch,   // amount to rotate in radians
+        [1, 0, 0]);       // axis to rotate around
 
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute.
     {
-        const numComponents = 2;  // pull out 2 values per iteration
+        const numComponents = 3;  // pull out 2 values per iteration
         const type = GL.FLOAT;    // the data in the buffer is 32bit floats
         const normalize = false;  // don't normalize
         const stride = 0;         // how many bytes to get from one set of values to the next
@@ -228,6 +300,9 @@ function drawScene() {
             PROGRAM_INFO.attribLocations.vertexColor);
     }
 
+
+    GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, buffers.indices);
+
     // Tell WebGL to use our program when drawing
 
     GL.useProgram(PROGRAM_INFO.program);
@@ -244,9 +319,10 @@ function drawScene() {
         modelViewMatrix);
 
     {
+        const vertexCount = 36;
+        const type = GL.UNSIGNED_SHORT;
         const offset = 0;
-        const vertexCount = 4;
-        GL.drawArrays(GL.TRIANGLE_STRIP, offset, vertexCount);
+        GL.drawElements(GL.TRIANGLES, vertexCount, type, offset);
     }
 }
 
@@ -256,23 +332,44 @@ window.addEventListener("keypress", (e)=>{
     switch(e.key){
         case 'w':
         {
-            console.log('hi');
-            squareRotation += 0.1;
+            
+            pitch -= 0.1;
             break;
         }
         case 's':
         {
-            squareRotation -= 0.1;
+            pitch += 0.1;
             break;
         }
         case 'd':
         {
+            yaw += 0.1;
             break;
         }
         case 'a':
         {
+            yaw -= 0.1;
             break;
         }
-        
+        case 'q':
+        {
+            roll += 0.1;
+            break;
+        }
+        case 'e':
+        {
+            roll -= 0.1;
+            break;
+        }
+        case 'z':
+        {
+            magnification += 0.1;
+            break;
+        }
+        case 'x':
+        {
+            magnification -= 0.1;
+            break;
+        }
     }
 })
