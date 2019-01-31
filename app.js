@@ -112,11 +112,11 @@ function initializeBuffers(GL, shape, colors) {
 
 window.addEventListener('resize', drawScene, false)
 
-
+let squareRotation = 0.0;
 
 drawScene();
 
-window.setInterval(drawScene, 50);
+window.setInterval(drawScene, 5);
 
 function drawScene() {
     GL.canvas.height = window.innerHeight;
@@ -124,10 +124,10 @@ function drawScene() {
     GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
  
     const shape = [
-        -1 ,  1,
-        1  ,  1,
-        -1 , -1,
-        1  , -1,
+        1 ,  1,
+        -1  ,  1,
+        1 , -1,
+        -1  , -1,
     ];
 
     const colors = [
@@ -182,6 +182,11 @@ function drawScene() {
     mat4.translate(modelViewMatrix,     // destination matrix
         modelViewMatrix,     // matrix to translate
         [-0.0, 0.0, -6.0]);  // amount to translate
+
+    mat4.rotate(modelViewMatrix,  // destination matrix
+        modelViewMatrix,  // matrix to rotate
+        squareRotation,   // amount to rotate in radians
+        [0, 0, 1]);       // axis to rotate around
 
     // Tell WebGL how to pull out the positions from the position
     // buffer into the vertexPosition attribute.
@@ -251,10 +256,13 @@ window.addEventListener("keypress", (e)=>{
     switch(e.key){
         case 'w':
         {
+            console.log('hi');
+            squareRotation += 0.1;
             break;
         }
         case 's':
         {
+            squareRotation -= 0.1;
             break;
         }
         case 'd':
