@@ -1,37 +1,39 @@
 const VERTEX_SHADER_SOURCE = `
     attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
+    attribute vec2 aTextureCoordinate;
 
     uniform mat4 uModelViewMatrix;
     uniform mat4 uProjectionMatrix;
 
-    varying lowp vec4 vColor;
+    varying highp vec2 vTextureCoordinate;
 
     void main() {
       gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vColor = aVertexColor;
+      vTextureCoordinate = aTextureCoordinate;
     }
   `;
 
 const FRAGMENT_SHADER_SOURCE = `
-  varying lowp vec4 vColor;
+  varying highp vec2 vTextureCoordinate;
+
+  uniform sampler2D uSampler;
 
   void main() {
-    gl_FragColor = vColor;
+    gl_FragColor = texture2D(uSampler, vTextureCoordinate);
   }
 `;
 
 
 const GL = document.querySelector('canvas').getContext('webgl')
 
-const SHADER_PROGRAM = (() =>{
+const SHADER_PROGRAM = (() => {
     const vertexShader = loadShader(GL, GL.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
     const fragmentShader = loadShader(GL, GL.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
     // Create the shader program
 
     const shaderProgram = GL.createProgram();
-    
+
     GL.attachShader(shaderProgram, vertexShader);
     GL.attachShader(shaderProgram, fragmentShader);
     GL.linkProgram(shaderProgram);
@@ -50,11 +52,12 @@ const PROGRAM_INFO = {
     program: SHADER_PROGRAM,
     attribLocations: {
         vertexPosition: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
-        vertexColor: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexColor'),
+        textureCoordinates: GL.getAttribLocation(SHADER_PROGRAM, 'aTextureCoordinate'),
     },
     uniformLocations: {
         projectionMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
         modelViewMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
+        uSampler: GL.getUniformLocation(SHADER_PROGRAM, 'uSampler'),
     },
 };
 
@@ -70,52 +73,77 @@ const SHAPE = [
     //Back
     -1.0, -1.0, -1.0,
     -1.0, 1.0, -1.0,
-    1.0, 1.0, -1.0, 
+    1.0, 1.0, -1.0,
     1.0, -1.0, -1.0,
 
     //Top
     -1.0, 1.0, -1.0,
     -1.0, 1.0, 1.0,
-    1.0, 1.0, 1.0, 
+    1.0, 1.0, 1.0,
     1.0, 1.0, -1.0,
 
     //Bottom
     -1.0, -1.0, -1.0,
     1.0, -1.0, -1.0,
-    1.0, -1.0, 1.0, 
+    1.0, -1.0, 1.0,
     -1.0, -1.0, 1.0,
 
     //Right
     1.0, -1.0, -1.0,
     1.0, 1.0, -1.0,
-    1.0, 1.0, 1.0, 
+    1.0, 1.0, 1.0,
     1.0, -1.0, 1.0,
 
     //Left
     -1.0, -1.0, -1.0,
     -1.0, -1.0, 1.0,
-    -1.0, 1.0, 1.0, 
+    -1.0, 1.0, 1.0,
     -1.0, 1.0, -1.0,
 
 ];
 
-const COLORS = [
-    [1.0,  1.0,  1.0,  1.0],    // white
-    [1.0,  0.0,  0.0,  1.0],    // red
-    [0.0,  1.0,  0.0,  1.0],    // green
-    [0.0,  0.0,  1.0,  1.0],    // blue
-    [1.0,  1.0,  0.0,  1.0],    // yellow
-    [1.0,  0.0,  1.0,  1.0],    // purple
-    ];
-
 const INDICES = [
-    0,  1,  2,      0,  2,  3,    // front
-    4,  5,  6,      4,  6,  7,    // back
-    8,  9,  10,     8,  10, 11,   // top
-    12, 13, 14,     12, 14, 15,   // bottom
-    16, 17, 18,     16, 18, 19,   // right
-    20, 21, 22,     20, 22, 23,   // left
-    ];
+    0, 1, 2, 0, 2, 3,    // front
+    4, 5, 6, 4, 6, 7,    // back
+    8, 9, 10, 8, 10, 11,   // top
+    12, 13, 14, 12, 14, 15,   // bottom
+    16, 17, 18, 16, 18, 19,   // right
+    20, 21, 22, 20, 22, 23,   // left
+];
+
+const TEXTURE_COORDINATES = [
+    // Front
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+    // Back
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+    // Top
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+    // Bottom
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+    // Right
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+    // Left
+    0.0, 0.0,
+    1.0, 0.0,
+    1.0, 1.0,
+    0.0, 1.0,
+];
+
 
 
 function loadShader(graphicsLibrary, type, source) {
@@ -139,39 +167,61 @@ function loadShader(graphicsLibrary, type, source) {
     return shader;
 }
 
-const BUFFERS = (() =>{
+const TEXTURE_FILENAME = 'texture.jpg';
+const TEXTURE = (() => {
+    const texture = GL.createTexture();
+    GL.bindTexture(GL.TEXTURE_2D, texture);
+    //Placeholder pixel image while texture resourse loads
+    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, 1, 1, 0, GL.RGBA,
+        GL.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.addEventListener("load",(e) => {
+        GL.bindTexture(GL.TEXTURE_2D, texture);
+        GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, image);
+
+        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+            GL.generateMipmap(GL.TEXTURE_2D);
+        } else {
+            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
+            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
+            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
+        }
+    });
+    image.src = TEXTURE_FILENAME;
+
+    return texture;
+})();
+
+function isPowerOf2(value) {
+    return (value & (value - 1)) == 0;
+}
+
+const BUFFERS = (() => {
     // Create a buffer for the square's positions.
     const positionBuffer = GL.createBuffer();
-
     // Select the positionBuffer as the one to apply buffer
     // operations to from here out.
     GL.bindBuffer(GL.ARRAY_BUFFER, positionBuffer);
-
     // Now pass the list of positions into WebGL to build the
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
     GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(SHAPE), GL.STATIC_DRAW);
 
-    var mappedColors = COLORS
-        .map(color => [color, color, color, color])
-        .reduce((previous_a, current_a) => previous_a.concat(current_a))
-        .reduce((previous_b, current_b) => previous_b.concat(current_b));
-
-
-    const colorBuffer = GL.createBuffer();
-    GL.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(mappedColors), GL.STATIC_DRAW);
-
+    const textureCoordinatesBuffer = GL.createBuffer();
+    GL.bindBuffer(GL.ARRAY_BUFFER, textureCoordinatesBuffer);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(TEXTURE_COORDINATES), GL.STATIC_DRAW);
+  
     const indexBuffer = GL.createBuffer();
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
     GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
         new Uint16Array(INDICES), GL.STATIC_DRAW);
 
     return {
         position: positionBuffer,
-        color: colorBuffer,
-        indices: indexBuffer
+        indices: indexBuffer,
+        textureCoordinates:  textureCoordinatesBuffer
     };
 
 })();
@@ -205,45 +255,43 @@ window.setInterval(drawScene, 20);
 function drawScene() {
     GL.canvas.height = window.innerHeight;
     GL.canvas.width = window.innerWidth;
-    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height) 
+    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
     GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
     GL.clearDepth(1.0);                 // Clear everything
     GL.enable(GL.DEPTH_TEST);           // Enable depth testing
     GL.depthFunc(GL.LEQUAL);            // Near things obscure far things
 
-    if(magnification_increase){
+    if (magnification_increase) {
         magnification += 0.1;
     }
 
-    if(magnification_decrease){
+    if (magnification_decrease) {
         magnification -= 0.1;
     }
 
-    if(pitch_increase){
+    if (pitch_increase) {
         pitch += 0.1;
     }
 
-    if(pitch_decrease){
+    if (pitch_decrease) {
         pitch -= 0.1;
     }
 
-    if(roll_increase){
+    if (roll_increase) {
         roll += 0.1;
     }
 
-    if(roll_decrease){
+    if (roll_decrease) {
         roll -= 0.1;
     }
 
-    if(yaw_increase){
+    if (yaw_increase) {
         yaw += 0.1;
     }
 
-    if(yaw_decrease){
+    if (yaw_decrease) {
         yaw -= 0.1;
     }
-
-    
 
     // Clear the canvas before we start drawing on it.
 
@@ -258,7 +306,7 @@ function drawScene() {
 
 
     const fieldOfView = 45 * Math.PI / 180;   // in radians
-    
+
     const aspect = GL.canvas.width / GL.canvas.height;
     const zNear = 0.1;
     const zFar = 100.0;
@@ -322,22 +370,19 @@ function drawScene() {
     }
 
     {
-        const numComponents = 4;  // pull out 2 values per iteration
-        const type = GL.FLOAT;    // the data in the buffer is 32bit floats
-        const normalize = false;  // don't normalize
-        const stride = 0;         // how many bytes to get from one set of values to the next
-        const offset = 0;         // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.color);
-        GL.vertexAttribPointer(
-            PROGRAM_INFO.attribLocations.vertexColor,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        GL.enableVertexAttribArray(
-            PROGRAM_INFO.attribLocations.vertexColor);
+        const num = 2; // every coordinate composed of 2 values
+        const type = GL.FLOAT; // the data in the buffer is 32 bit float
+        const normalize = false; // don't normalize
+        const stride = 0; // how many bytes to get from one set to the next
+        const offset = 0; // how many bytes inside the buffer to start from
+        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.textureCoordinates);
+        GL.vertexAttribPointer(PROGRAM_INFO.attribLocations.textureCoordinates, num, type, normalize, stride, offset);
+        GL.enableVertexAttribArray(PROGRAM_INFO.attribLocations.textureCoordinates);
     }
+
+    GL.activeTexture(GL.TEXTURE0);
+    GL.bindTexture(GL.TEXTURE_2D, TEXTURE);
+    GL.uniform1i(PROGRAM_INFO.uniformLocations.uSampler, 0);
 
 
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, BUFFERS.indices);
@@ -365,57 +410,57 @@ function drawScene() {
     }
 }
 
-function handleInput(key, active){
-    switch(key){
+function handleInput(key, active) {
+    switch (key) {
         case 'w':
-        {
-            pitch_decrease = active;
-            break;
-        }
+            {
+                pitch_decrease = active;
+                break;
+            }
         case 's':
-        {
-            pitch_increase = active;
-            break;
-        }
+            {
+                pitch_increase = active;
+                break;
+            }
         case 'd':
-        {
-            yaw_increase = active;
-            break;
-        }
+            {
+                yaw_increase = active;
+                break;
+            }
         case 'a':
-        {
-            yaw_decrease = active;
-            break;
-        }
+            {
+                yaw_decrease = active;
+                break;
+            }
         case 'q':
-        {
-            roll_increase = active;
-            break;
-        }
+            {
+                roll_increase = active;
+                break;
+            }
         case 'e':
-        {
-            roll_decrease = active;
-            break;
-        }
+            {
+                roll_decrease = active;
+                break;
+            }
         case 'z':
-        {
-            magnification_increase = active;
-            break;
-        }
+            {
+                magnification_increase = active;
+                break;
+            }
         case 'x':
-        {
-            magnification_decrease = active;
-            break;
-        }
+            {
+                magnification_decrease = active;
+                break;
+            }
     }
 }
 
-window.addEventListener("keydown", (e)=>{
+window.addEventListener("keydown", (e) => {
     handleInput(e.key, true);
 })
 
 
 
-window.addEventListener("keyup", (e)=>{
+window.addEventListener("keyup", (e) => {
     handleInput(e.key, false);
 })
