@@ -59,6 +59,65 @@ const PROGRAM_INFO = {
 };
 
 
+//X , Y , Z
+const SHAPE = [
+    //Front
+    -1.0, -1.0, 1.0,
+    1.0, -1.0, 1.0,
+    1.0, 1.0, 1.0,
+    -1.0, 1.0, 1.0,
+
+    //Back
+    -1.0, -1.0, -1.0,
+    -1.0, 1.0, -1.0,
+    1.0, 1.0, -1.0, 
+    1.0, -1.0, -1.0,
+
+    //Top
+    -1.0, 1.0, -1.0,
+    -1.0, 1.0, 1.0,
+    1.0, 1.0, 1.0, 
+    1.0, 1.0, -1.0,
+
+    //Bottom
+    -1.0, -1.0, -1.0,
+    1.0, -1.0, -1.0,
+    1.0, -1.0, 1.0, 
+    -1.0, -1.0, 1.0,
+
+    //Right
+    1.0, -1.0, -1.0,
+    1.0, 1.0, -1.0,
+    1.0, 1.0, 1.0, 
+    1.0, -1.0, 1.0,
+
+    //Left
+    -1.0, -1.0, -1.0,
+    -1.0, -1.0, 1.0,
+    -1.0, 1.0, 1.0, 
+    -1.0, 1.0, -1.0,
+
+];
+
+const COLORS = [
+    [1.0,  1.0,  1.0,  1.0],    // white
+    [1.0,  0.0,  0.0,  1.0],    // red
+    [0.0,  1.0,  0.0,  1.0],    // green
+    [0.0,  0.0,  1.0,  1.0],    // blue
+    [1.0,  1.0,  0.0,  1.0],    // yellow
+    [1.0,  0.0,  1.0,  1.0],    // purple
+    ];
+
+const INDICES = [
+    0,  1,  2,      0,  2,  3,    // front
+    4,  5,  6,      4,  6,  7,    // back
+    8,  9,  10,     8,  10, 11,   // top
+    12, 13, 14,     12, 14, 15,   // bottom
+    16, 17, 18,     16, 18, 19,   // right
+    20, 21, 22,     20, 22, 23,   // left
+    ];
+
+
 function loadShader(graphicsLibrary, type, source) {
     const shader = graphicsLibrary.createShader(type);
 
@@ -80,9 +139,7 @@ function loadShader(graphicsLibrary, type, source) {
     return shader;
 }
 
-
-
-function initializeBuffers(GL, shape, colors, indices) {
+const BUFFERS = (() =>{
     // Create a buffer for the square's positions.
     const positionBuffer = GL.createBuffer();
 
@@ -93,16 +150,13 @@ function initializeBuffers(GL, shape, colors, indices) {
     // Now pass the list of positions into WebGL to build the
     // shape. We do this by creating a Float32Array from the
     // JavaScript array, then use it to fill the current buffer.
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(shape), GL.STATIC_DRAW);
+    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(SHAPE), GL.STATIC_DRAW);
 
-    var mappedColors = [];
+    var mappedColors = COLORS
+        .map(color => [color, color, color, color])
+        .reduce((previous_a, current_a) => previous_a.concat(current_a))
+        .reduce((previous_b, current_b) => previous_b.concat(current_b));
 
-    for (var j = 0; j < colors.length; ++j) {
-      const c = colors[j];
-  
-      // Repeat each color four times for the four vertices of the face
-      mappedColors = mappedColors.concat(c, c, c, c);
-    }
 
     const colorBuffer = GL.createBuffer();
     GL.bindBuffer(GL.ARRAY_BUFFER, colorBuffer);
@@ -112,18 +166,32 @@ function initializeBuffers(GL, shape, colors, indices) {
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
     GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices), GL.STATIC_DRAW);
+        new Uint16Array(INDICES), GL.STATIC_DRAW);
 
     return {
         position: positionBuffer,
         color: colorBuffer,
         indices: indexBuffer
     };
-}
+
+})();
 
 
 
-window.addEventListener('resize', drawScene, false)
+
+window.addEventListener('resize', drawScene, false);
+
+let yaw_increase = false;
+let yaw_decrease = false;
+
+let roll_increase = false;
+let roll_decrease = false;
+
+let pitch_increase = false;
+let pitch_decrease = false;
+
+let magnification_increase = false;
+let magnification_decrease = false;
 
 let yaw = 0.0;
 let roll = 0.0;
@@ -132,78 +200,50 @@ let magnification = 0.0;
 
 drawScene();
 
-window.setInterval(drawScene, 5);
+window.setInterval(drawScene, 20);
 
 function drawScene() {
     GL.canvas.height = window.innerHeight;
     GL.canvas.width = window.innerWidth;
-    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height)
- 
-        //X , Y , Z
-    const shape = [
-        //Front
-        -1.0, -1.0, 1.0,
-        1.0, -1.0, 1.0,
-        1.0, 1.0, 1.0,
-        -1.0, 1.0, 1.0,
-
-        //Back
-        -1.0, -1.0, -1.0,
-        -1.0, 1.0, -1.0,
-        1.0, 1.0, -1.0, 
-        1.0, -1.0, -1.0,
-
-        //Top
-        -1.0, 1.0, -1.0,
-        -1.0, 1.0, 1.0,
-        1.0, 1.0, 1.0, 
-        1.0, 1.0, -1.0,
-
-        //Bottom
-        -1.0, -1.0, -1.0,
-        1.0, -1.0, -1.0,
-        1.0, -1.0, 1.0, 
-        -1.0, -1.0, 1.0,
-
-        //Right
-        1.0, -1.0, -1.0,
-        1.0, 1.0, -1.0,
-        1.0, 1.0, 1.0, 
-        1.0, -1.0, 1.0,
-
-        //Left
-        -1.0, -1.0, -1.0,
-        -1.0, -1.0, 1.0,
-        -1.0, 1.0, 1.0, 
-        -1.0, 1.0, -1.0,
-
-    ];
-
-    const colors = [
-        1.0,  1.0,  1.0,  1.0,    // white
-        1.0,  0.0,  0.0,  1.0,    // red
-        0.0,  1.0,  0.0,  1.0,    // green
-        0.0,  0.0,  1.0,  1.0,    // blue
-        1.0,  1.0,  0.0,  1.0,    // yellow
-        1.0,  0.0,  1.0,  1.0,    // purple
-      ];
-
-    const indices = [
-        0,  1,  2,      0,  2,  3,    // front
-        4,  5,  6,      4,  6,  7,    // back
-        8,  9,  10,     8,  10, 11,   // top
-        12, 13, 14,     12, 14, 15,   // bottom
-        16, 17, 18,     16, 18, 19,   // right
-        20, 21, 22,     20, 22, 23,   // left
-      ];
-
-    const buffers = initializeBuffers(GL, shape, colors, indices);
-
-    
+    GL.viewport(0, 0, GL.canvas.width, GL.canvas.height) 
     GL.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
     GL.clearDepth(1.0);                 // Clear everything
     GL.enable(GL.DEPTH_TEST);           // Enable depth testing
     GL.depthFunc(GL.LEQUAL);            // Near things obscure far things
+
+    if(magnification_increase){
+        magnification += 0.1;
+    }
+
+    if(magnification_decrease){
+        magnification -= 0.1;
+    }
+
+    if(pitch_increase){
+        pitch += 0.1;
+    }
+
+    if(pitch_decrease){
+        pitch -= 0.1;
+    }
+
+    if(roll_increase){
+        roll += 0.1;
+    }
+
+    if(roll_decrease){
+        roll -= 0.1;
+    }
+
+    if(yaw_increase){
+        yaw += 0.1;
+    }
+
+    if(yaw_decrease){
+        yaw -= 0.1;
+    }
+
+    
 
     // Clear the canvas before we start drawing on it.
 
@@ -269,7 +309,7 @@ function drawScene() {
         const stride = 0;         // how many bytes to get from one set of values to the next
         // 0 = use type and numComponents above
         const offset = 0;         // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, buffers.position);
+        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.position);
         GL.vertexAttribPointer(
             PROGRAM_INFO.attribLocations.vertexPosition,
             numComponents,
@@ -286,9 +326,8 @@ function drawScene() {
         const type = GL.FLOAT;    // the data in the buffer is 32bit floats
         const normalize = false;  // don't normalize
         const stride = 0;         // how many bytes to get from one set of values to the next
-        // 0 = use type and numComponents above
         const offset = 0;         // how many bytes inside the buffer to start from
-        GL.bindBuffer(GL.ARRAY_BUFFER, buffers.color);
+        GL.bindBuffer(GL.ARRAY_BUFFER, BUFFERS.color);
         GL.vertexAttribPointer(
             PROGRAM_INFO.attribLocations.vertexColor,
             numComponents,
@@ -301,7 +340,7 @@ function drawScene() {
     }
 
 
-    GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, buffers.indices);
+    GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, BUFFERS.indices);
 
     // Tell WebGL to use our program when drawing
 
@@ -326,50 +365,57 @@ function drawScene() {
     }
 }
 
-
-window.addEventListener("keypress", (e)=>{
-    const distance = .05;
-    switch(e.key){
+function handleInput(key, active){
+    switch(key){
         case 'w':
         {
-            
-            pitch -= 0.1;
+            pitch_decrease = active;
             break;
         }
         case 's':
         {
-            pitch += 0.1;
+            pitch_increase = active;
             break;
         }
         case 'd':
         {
-            yaw += 0.1;
+            yaw_increase = active;
             break;
         }
         case 'a':
         {
-            yaw -= 0.1;
+            yaw_decrease = active;
             break;
         }
         case 'q':
         {
-            roll += 0.1;
+            roll_increase = active;
             break;
         }
         case 'e':
         {
-            roll -= 0.1;
+            roll_decrease = active;
             break;
         }
         case 'z':
         {
-            magnification += 0.1;
+            magnification_increase = active;
             break;
         }
         case 'x':
         {
-            magnification -= 0.1;
+            magnification_decrease = active;
             break;
         }
     }
+}
+
+window.addEventListener("keydown", (e)=>{
+    handleInput(e.key, true);
+})
+
+
+
+window.addEventListener("keyup", (e)=>{
+    handleInput(e.key, false);
 })
