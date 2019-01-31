@@ -1,296 +1,12 @@
-const VERTEX_SHADER_SOURCE = `
-    attribute vec4 aVertexPosition;
-    attribute vec3 aVertexNormal;
-    attribute vec2 aTextureCoord;
-
-    uniform mat4 uNormalMatrix;
-    uniform mat4 uModelViewMatrix;
-    uniform mat4 uProjectionMatrix;
-
-    varying highp vec2 vTextureCoord;
-    varying highp vec3 vLighting;
-
-    void main(void) {
-    gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-    vTextureCoord = aTextureCoord;
-
-    // Apply lighting effect
-
-    highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-    highp vec3 directionalLightColor = vec3(1, 0, 0);
-    highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
-
-    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
-
-    highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-    vLighting = ambientLight + (directionalLightColor * directional);
-    }
-  `;
-
-const FRAGMENT_SHADER_SOURCE = `
-    varying highp vec2 vTextureCoord;
-    varying highp vec3 vLighting;
-
-    uniform sampler2D uSampler;
-
-    void main(void) {
-    highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
-
-    gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
-    }
-`;
-
-
-const GL = document.querySelector('canvas').getContext('webgl')
-
-const SHADER_PROGRAM = (() => {
-    const vertexShader = loadShader(GL, GL.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
-    const fragmentShader = loadShader(GL, GL.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
-
-    // Create the shader program
-
-    const shaderProgram = GL.createProgram();
-
-    GL.attachShader(shaderProgram, vertexShader);
-    GL.attachShader(shaderProgram, fragmentShader);
-    GL.linkProgram(shaderProgram);
-
-    // If creating the shader program failed, alert
-
-    if (!GL.getProgramParameter(shaderProgram, GL.LINK_STATUS)) {
-        alert('Unable to initialize the shader program: ' + GL.getProgramInfoLog(shaderProgram));
-        return null;
-    }
-
-    return shaderProgram;
-})();
-
-const PROGRAM_INFO = {
-    program: SHADER_PROGRAM,
-    attribLocations: {
-        vertexPosition: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexPosition'),
-        vertexNormal: GL.getAttribLocation(SHADER_PROGRAM, 'aVertexNormal'),
-        textureCoordinates: GL.getAttribLocation(SHADER_PROGRAM, 'aTextureCoord'),
-    },
-    uniformLocations: {
-        projectionMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uProjectionMatrix'),
-        modelViewMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uModelViewMatrix'),
-        normalMatrix: GL.getUniformLocation(SHADER_PROGRAM, 'uNormalMatrix'),
-        uSampler: GL.getUniformLocation(SHADER_PROGRAM, 'uSampler'),
-    },
-};
-
-
-//X , Y , Z
-const SHAPE = [
-    //Front
-    -1.0, -1.0, 1.0,
-    1.0, -1.0, 1.0,
-    1.0, 1.0, 1.0,
-    -1.0, 1.0, 1.0,
-
-    //Back
-    -1.0, -1.0, -1.0,
-    -1.0, 1.0, -1.0,
-    1.0, 1.0, -1.0,
-    1.0, -1.0, -1.0,
-
-    //Top
-    -1.0, 1.0, -1.0,
-    -1.0, 1.0, 1.0,
-    1.0, 1.0, 1.0,
-    1.0, 1.0, -1.0,
-
-    //Bottom
-    -1.0, -1.0, -1.0,
-    1.0, -1.0, -1.0,
-    1.0, -1.0, 1.0,
-    -1.0, -1.0, 1.0,
-
-    //Right
-    1.0, -1.0, -1.0,
-    1.0, 1.0, -1.0,
-    1.0, 1.0, 1.0,
-    1.0, -1.0, 1.0,
-
-    //Left
-    -1.0, -1.0, -1.0,
-    -1.0, -1.0, 1.0,
-    -1.0, 1.0, 1.0,
-    -1.0, 1.0, -1.0,
-
-];
-
-const INDICES = [
-    0, 1, 2, 0, 2, 3,    // front
-    4, 5, 6, 4, 6, 7,    // back
-    8, 9, 10, 8, 10, 11,   // top
-    12, 13, 14, 12, 14, 15,   // bottom
-    16, 17, 18, 16, 18, 19,   // right
-    20, 21, 22, 20, 22, 23,   // left
-];
-
-const TEXTURE_COORDINATES = [
-    // Front
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-    // Back
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-    // Top
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-    // Bottom
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-    // Right
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-    // Left
-    0.0, 0.0,
-    1.0, 0.0,
-    1.0, 1.0,
-    0.0, 1.0,
-];
-
-
-const VERTEX_NORMALS = [
-    // Front
-     0.0,  0.0,  1.0,
-     0.0,  0.0,  1.0,
-     0.0,  0.0,  1.0,
-     0.0,  0.0,  1.0,
-
-    // Back
-     0.0,  0.0, -1.0,
-     0.0,  0.0, -1.0,
-     0.0,  0.0, -1.0,
-     0.0,  0.0, -1.0,
-
-    // Top
-     0.0,  1.0,  0.0,
-     0.0,  1.0,  0.0,
-     0.0,  1.0,  0.0,
-     0.0,  1.0,  0.0,
-
-    // Bottom
-     0.0, -1.0,  0.0,
-     0.0, -1.0,  0.0,
-     0.0, -1.0,  0.0,
-     0.0, -1.0,  0.0,
-
-    // Right
-     1.0,  0.0,  0.0,
-     1.0,  0.0,  0.0,
-     1.0,  0.0,  0.0,
-     1.0,  0.0,  0.0,
-
-    // Left
-    -1.0,  0.0,  0.0,
-    -1.0,  0.0,  0.0,
-    -1.0,  0.0,  0.0,
-    -1.0,  0.0,  0.0
-  ];
-
-
-
-function loadShader(graphicsLibrary, type, source) {
-    const shader = graphicsLibrary.createShader(type);
-
-    graphicsLibrary.shaderSource(shader, source);
-
-    graphicsLibrary.compileShader(shader);
-
-    if (!graphicsLibrary.getShaderParameter(shader, graphicsLibrary.COMPILE_STATUS)) {
-        alert('An error occurred compiling the shaders: ' + graphicsLibrary.getShaderInfoLog(shader));
-        graphicsLibrary.deleteShader(shader);
-        return null;
-    }
-    return shader;
+let dependencies ={
+    fragmentShaderSource: null,
+    vertexShaderSource: null,
+    shape: null,
+    indices: null,
+    textureCoordinates: null,
+    vertexNormals: null,
+    textureFilename: null
 }
-
-const TEXTURE_FILENAME = 'texture.jpg';
-const TEXTURE = (() => {
-    const texture = GL.createTexture();
-    GL.bindTexture(GL.TEXTURE_2D, texture);
-    //Placeholder pixel image while texture resourse loads
-    GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, 1, 1, 0, GL.RGBA,
-        GL.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
-
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.addEventListener("load",(e) => {
-        GL.bindTexture(GL.TEXTURE_2D, texture);
-        GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, image);
-
-        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
-            GL.generateMipmap(GL.TEXTURE_2D);
-        } else {
-            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE);
-            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE);
-            GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.LINEAR);
-        }
-    });
-    image.src = TEXTURE_FILENAME;
-
-    return texture;
-})();
-
-function isPowerOf2(value) {
-    return (value & (value - 1)) == 0;
-}
-
-const BUFFERS = (() => {
-    // Create a buffer for the square's positions.
-    const positionBuffer = GL.createBuffer();
-    // Select the positionBuffer as the one to apply buffer
-    // operations to from here out.
-    GL.bindBuffer(GL.ARRAY_BUFFER, positionBuffer);
-    // Now pass the list of positions into WebGL to build the
-    // shape. We do this by creating a Float32Array from the
-    // JavaScript array, then use it to fill the current buffer.
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(SHAPE), GL.STATIC_DRAW);
-
-    const textureCoordinatesBuffer = GL.createBuffer();
-    GL.bindBuffer(GL.ARRAY_BUFFER, textureCoordinatesBuffer);
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(TEXTURE_COORDINATES), GL.STATIC_DRAW);
-  
-    const indexBuffer = GL.createBuffer();
-    GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(INDICES), GL.STATIC_DRAW);
-
-
-    const normalBuffer = GL.createBuffer();
-    GL.bindBuffer(GL.ARRAY_BUFFER, normalBuffer);
-    GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(VERTEX_NORMALS),
-    GL.STATIC_DRAW);
-
-      
-
-    return {
-        position: positionBuffer,
-        indices: indexBuffer,
-        textureCoordinates:  textureCoordinatesBuffer,
-        normal: normalBuffer
-    };
-
-})();
-
-
-
-
-window.addEventListener('resize', drawScene, false);
 
 let yaw_increase = false;
 let yaw_decrease = false;
@@ -309,9 +25,151 @@ let roll = 0.0;
 let pitch = 0.0;
 let magnification = 0.0;
 
-drawScene();
+function loadDependencies()
+{
+    fetch('source.fragment').then(r => r.text().then(d => {
+        dependencies.fragmentShaderSource = d;
+    }));
+    
+    fetch('source.vertex').then(r => r.text().then(d => {
+        dependencies.vertexShaderSource = d;
+    }));
+    
+    fetch('model.json').then(response =>{
+        response.json().then(model => {
+            dependencies.shape = model.shape;
+            dependencies.indices = model.indices;
+            dependencies.textureCoordinates = model.textureCoordinates;
+            dependencies.vertexNormals = model.vertexNormals;
+            dependencies.textureFilename = model.textureFilename;
+        })
+    });
 
-window.setInterval(drawScene, 20);
+    if((dependencies.vertexShaderSource == null) 
+        || (dependencies.fragmentShaderSource == null) 
+        || (dependencies.shape == null)){
+            window.setTimeout(loadDependencies, 1000);
+        }
+    else{
+        runProgram();
+    }
+}
+
+loadDependencies();
+
+function runProgram(){
+    const gl = document.querySelector('canvas').getContext('webgl')
+
+    const shaderProgram = (() => {
+        const vertexShader = loadShader(gl, gl.VERTEX_SHADER, dependencies.vertexShaderSource);
+        const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, dependencies.fragmentShaderSource);
+        const shaderProgram = gl.createProgram();
+
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        // If creating the shader program failed, alert
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+            return null;
+        }
+
+        return shaderProgram;
+    })();
+
+    const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
+            textureCoordinates: gl.getAttribLocation(shaderProgram, 'aTextureCoord'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
+            uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+        },
+    };
+    const texture = (() => {
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        //Placeholder pixel image while texture resourse loads
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA,
+            gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 255, 255]));
+
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.addEventListener("load",(e) => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+
+            if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+                gl.generateMipmap(gl.TEXTURE_2D);
+            } else {
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            }
+        });
+        image.src = dependencies.textureFilename;
+
+        return texture;
+    })();
+
+    const buffers = (() => {
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dependencies.shape), gl.STATIC_DRAW);
+
+        const textureCoordinatesBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordinatesBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dependencies.textureCoordinates), gl.STATIC_DRAW);
+    
+        const indexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(dependencies.indices), gl.STATIC_DRAW);
+
+
+        const normalBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dependencies.vertexNormals),gl.STATIC_DRAW);
+
+        return {
+            position: positionBuffer,
+            indices: indexBuffer,
+            textureCoordinates:  textureCoordinatesBuffer,
+            normal: normalBuffer
+        };
+    })();
+
+    window.addEventListener('resize', () => drawScene(gl, programInfo, buffers, texture), false);
+    drawScene(gl, programInfo, buffers, texture);
+    window.setInterval(() => drawScene(gl, programInfo, buffers, texture), 20);
+    window.addEventListener("keydown", (e) => { handleInput(e.key, true);})
+    window.addEventListener("keyup", (e) => { handleInput(e.key, false);})
+}
+
+function isPowerOf2(value) {
+    return (value & (value - 1)) == 0;
+}
+
+function loadShader(gl, type, source) {
+    const shader = gl.createShader(type);
+
+    gl.shaderSource(shader, source);
+
+    gl.compileShader(shader);
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
 
 function updateVariables(){
     if (magnification_increase) {
@@ -347,7 +205,7 @@ function updateVariables(){
     }
 }
 
-function drawScene() {
+function drawScene(GL, PROGRAM_INFO, BUFFERS, TEXTURE) {
     GL.canvas.height = window.innerHeight;
     GL.canvas.width = window.innerWidth;
     updateVariables();
@@ -443,13 +301,3 @@ function handleInput(key, active) {
             }
     }
 }
-
-window.addEventListener("keydown", (e) => {
-    handleInput(e.key, true);
-})
-
-
-
-window.addEventListener("keyup", (e) => {
-    handleInput(e.key, false);
-})
